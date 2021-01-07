@@ -1,0 +1,1560 @@
+---
+title: "ER1143 - Incapacités, sortie du marché du travail et départ à la retraite"
+author: "Patrick Aubert"
+date: "`r format(Sys.time(), '%d %B %Y à %Hh%M')`"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '2'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r message=FALSE,echo=FALSE}
+options(encoding="UTF-8")
+```
+
+```{r}
+# ================================================================================================
+# Copyright (C) 2020. Logiciel élaboré par l’État, via la Drees.
+
+# Nom de l’auteur : Patrick Aubert, Drees.
+
+# Ce programme informatique a été développé par la Drees. Il permet de produire les illustrations de la 
+# publication n°1143 de la collection Études et résultats, qui décrit les fins de carrières et les départs
+# à la retraite selon le niveau d'incapacité des personnes.
+
+# Le texte et les tableaux de l’article peuvent être consultés sur le site de la DREES : 
+# https://drees.solidarites-sante.gouv.fr/etudes-et-statistiques/publications/etudes-et-resultats/article/les-personnes-ayant-des-incapacites-quittent-le-marche-du-travail-plus-jeunes
+
+# Ce programme utilise les données de l'enquête Emploi de l'Insee. L'ER n°1143 utilise les versions des bases disponibles à la DREES en décembre  2019. Le présent fichier HTML utilise les versions disponibles en août 2020.
+# ATTENTION : utiliser le programme sur des versions plus récentes de l'enquête Emploi peut conduire à des résultats légèrement différents, du fait des révisions des bases (notamment des pondérations, du fait du recalage sur les données du recensement).
+
+# Bien qu’il n’existe aucune obligation légale à ce sujet, les utilisateurs de ce programme sont invités à 
+# signaler à la DREES leurs travaux issus de la réutilisation de ce code, ainsi que les éventuels problèmes 
+# ou anomalies qu’ils y rencontreraient, en écrivant à l’adresse électronique DREES-CODE@sante.gouv.fr
+
+# Ce programme a été exécuté le 31/10/2020 avec la version 3.5.1 de R et les versions suivantes des packages : rdrees_0.0.1.0000, kableExtra_1.1.0, knitr_1.23, haven_2.2.0, plotly_4.8.0, ggplot2_3.1.0, reshape2_1.4.3, data.table_1.11.8, tidyr_1.0.2, dplyr_0.8.3.
+
+# ================================================================================================
+
+# LICENCE : Ce logiciel est régi par la licence “GNU General Public License” GPL-3.0. # https://spdx.org/licenses/GPL-3.0.html#licenseText
+
+# À cet égard l'attention de l'utilisateur est attirée sur les risques associés au chargement, à l'utilisation,
+# à la modification et/ou au développement et à la reproduction du logiciel par l'utilisateur étant donné sa 
+# spécificité de logiciel libre, qui peut le rendre complexe à manipuler et qui le réserve donc à des 
+# développeurs et des professionnels avertis possédant des connaissances informatiques approfondies. 
+# Les utilisateurs sont donc invités à charger et tester l'adéquation du logiciel à leurs besoins dans des 
+# conditions permettant d'assurer la sécurité de leurs systèmes et ou de leurs données et, plus généralement, 
+# à l'utiliser et l'exploiter dans les mêmes conditions de sécurité.
+
+# Le fait que vous puissiez accéder à cet en-tête signifie que vous avez pris connaissance de la licence GPL-3.0, et que vous en avez accepté les termes.
+
+# This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License along with this program.If not, see <https://www.gnu.org/licenses/>.
+
+# ================================================================================================
+```
+
+<style type="text/css">
+body{ /* Normal  */
+font-family: Calibri;   
+<!-- font-family: "Times New Roman", Times, serif; -->
+font-size: 12px;
+}
+td {  /* Table  */
+font-size: 12px;
+}
+h1.title {
+font-size: 38px;
+color: DarkRed;
+}
+h1 { /* Header 1 */
+font-size: 20px;
+font-family: "Arial";
+color: rgb(232,61,84);
+}
+h2 { /* Header 2 */
+font-size: 16px;
+font-family: "Arial";
+color: rgb(232,61,84);
+}
+h3 { /* Header 3 */
+font-size: 14px;
+font-family: "Arial";
+color: rgb(232,61,84);
+}
+code.r{ /* Code block */
+font-size: 14px;
+font-family: "Arial Narrow";
+}
+pre { /* Code block - determines code spacing between lines */
+font-size: 12px;
+font-family: Consolas;
+}
+
+</style>
+
+
+
+```{r message=FALSE,echo=FALSE}
+# ================================================================================================
+# librairies et options générales
+
+options(encoding="UTF-8")
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(reshape2)
+library(ggplot2)
+library(plotly)
+library(haven)
+library(knitr)
+library(kableExtra)
+library(rdrees)
+
+# ================================================================================================
+# répertoires utiles pour l'étude
+
+replocal <- "C:/Users/patrick.aubert/Documents/Etudes/2019_12_ER Retraite et incapacités/version Gitlab (ouverture du code)"
+setwd(replocal)
+local <- function(rep) { paste(replocal,rep,"/",sep="") }
+
+direc <- local("")
+
+# Le répertoire où sont stockées les fonctions d'extraction des sources
+dirfonctions <- local("/fonctions")
+
+# Le répertoire où sont stockés les résultats semi-agrégés (ventilés par sexe*âge fin)
+dirdonnees <- local("/données")
+
+# inclut les bibliothèse de fonctions utiles
+
+source(paste(dirfonctions,"import données EEC.R",sep=""))
+source(paste(dirfonctions,"fonctions mise en forme DREES.R",sep=""))
+source(paste(dirfonctions,"fonctions calcul EV.R",sep=""))
+
+fichier.excel.ER <- "ER Retraite et incapacités.xlsx"
+
+# ================================================================================================
+# Options du programme
+
+# Choix des années étudiées
+anneedeb <- 2013 # première année pour lequelle l'indicateur GALI est disponible dans l'EEC
+anneefin <- 2019 # dernière année disponible de l'EEC (2018 pour l'ER n°1143)
+anneerepr <- 2018 # = l'année présentée dans l'ER n°1143
+
+# si la variable suivante vaut TRUE, tout est recalculé à partir des tables de base (enquête Emploi ...)
+# sinon, on récupére les données préalablement sauvegardées dans des fichiers .csv
+refait.tout <- FALSE
+if (refait.tout) {
+  # Les répertoires suivant contiennent les données sources
+  repeec <-"T:/Ressources/INSEE/Emploi en continu/"
+}
+
+# si la variable suivante vaut TRUE, le programme exporte les résultats dans un fichier Excel
+# !! ATTENTION !! : ce n'est possible qu'à partir du package RDREES (mettre FALSE si vous n'avez pas ce package)
+exportDREES <- FALSE
+
+# ================================================================================================
+# Paramètres graphiques
+
+# utiliser les deux lignes suivantes pour une mise en forme selon la charte graphique des ER de la DREES
+ggplot_line_local <- function(...) {  ggplot_line_style_ER( ...)  }
+ggplot_bar_local <- function(...) {  ggplot_bar_style_ER( ...)  }
+
+# utiliser les deux lignes suivantes pour une mise en forme classique
+#ggplot_line_local <- function(...) {  ggplot( ...)  }
+#ggplot_bar_local <- function(...) {  ggplot( ...)  }
+
+# ================================================================================================
+# intitulés des modalités pour les diverses variables de catégorie
+
+modalites.limact <- list("1" = "fortement limitées", 
+                         "2" = "limitées, mais pas fortement",
+                         "3" = "pas limitées du tout",
+                         "8" = "refus de répondre",
+                         "9" = "ne sait pas")
+
+noms.modalites.taux <- list(
+  "nerp" = "Taux de seniors NERP",
+  "ret" = "Taux de retraités", 
+  "nouveauret" = "Taux de nouveaux retraités",
+  "nonret" = "Taux de non retraités", 
+  "nonretaod" = "Taux de non retraités ou de retraités avant l'AOD",
+  "emploi" = "Taux d'emploi",
+  "actif" = "Taux d'activité",
+  "emploihorscumul" = "Taux d'emploi (hors cumul avec retraite)")
+
+noms.modalites.dureesconj <- list(
+  "nonret" = "Liquidation retraite", 
+  "emploi" = "Emploi",
+  "actif" = "Activité",
+  "nonretaod" = "Liq. retraite (neutralisation départs avant l'AOD)",
+  "nerp" = "Sans emploi ni retraite",
+  "emploihorscumul" = "Emploi (hors cumul)")
+
+modalites.SEXE <- list(
+  "0" = "Ensemble",
+  "1" = "Hommes",
+  "2" = "Femmes"
+)
+
+modalites.cs <- list("1" = "1 - Agriculteurs exploitants", 
+                     "2" = "2 - Artisans, commerçants et chefs d'entreprise",
+                     "3" = "3 - Cadres et professions intellectuelles supérieures",
+                     "4" = "4 - Professions intermédiaires",
+                     "5" = "5 - Employés",
+                     "6" = "6 - Ouvriers",
+                     "9" = "9 - Toutes CSP confondues",     # (non canonique)
+                     "11" = "11 - Agriculteurs sur petite exploitation",
+"12" = "12 - Agriculteurs sur moyenne exploitation",
+"13" = "13 - Agriculteurs sur grande exploitation",
+"21" = "21 - Artisans",
+"22" = "22 - Commerçants et assimilés",
+"23" = "23 - Chefs d'entreprise de 10 salariés ou plus",
+"31" = "31 - Professions libérales",
+"33" = "33 - Cadres de la fonction publique",
+"34" = "34 - Professeurs, professions scientifiques",
+"35" = "35 - Professions de l'information, des arts et des spectacles",
+"37" = "37 - Cadres administratifs et commerciaux d'entreprise",
+"38" = "38 - Ingénieurs et cadres techniques d'entreprise",
+"42" = "42 - Professeurs des écoles, instituteurs et assimilés",
+"43" = "43 - Professions intermédiaires de la santé et  du travail social",
+"44" = "44 - Clergé, religieux",
+"45" = "45 - Professions intermédiaires administratives de la fonction publique",
+"46" = "46 - Professions intermédiaires administratives et commerciales des entreprises",
+"47" = "47 - Techniciens",
+"48" = "48 - Contremaîtres, agents de maîtrise",
+"52" = "52 - Employés civils et agents de service de la fonction publique",
+"53" = "53 - Policiers et militaires",
+"54" = "54 - Employés administratifs d'entreprise",
+"55" = "55 - Employés de commerce",
+"56" = "56 - Personnels des services directs aux particuliers",
+"62" = "62 - Ouvriers qualifiés de type industriel",
+"63" = "63 - Ouvriers qualifiés de type artisanal",
+"64" = "64 - Chauffeurs",
+"65" = "65 - Ouvriers qualifiés de la manutention, du magasinage et du transport",
+"67" = "67 - Ouvriers non qualifiés de type industriel",
+"68" = "68 - Ouvriers non qualifiés de type artisanal",
+"69" = "69 - Ouvriers agricoles",
+"71" = "71 - Anciens agriculteurs exploitants",
+"72" = "72 - Anciens artisans, commerçants, chefs d'entreprise",
+"74" = "74 - Anciens cadres",
+"75" = "75 - Anciennes professions intermédiaires",
+"77" = "77 - Anciens employés",
+"78" = "78 - Anciens ouvriers",
+"81" = "81 - Chômeurs n'ayant jamais travaillé",
+"83" = "83 - Militaires du contingent",
+"84" = "84 - Elèves, étudiants",
+"85" = "85 - Personnes diverses sans activité  professionnelle de moins de 60 ans (sauf retraités)",
+"86" = "86 - Personnes diverses sans activité professionnelle de 60 ans et plus (sauf retraités)"
+)
+
+# ================================================================================================
+# fonction de statistique descriptive utile
+    
+TableauCroise <- function(tab, poids, varcol, varligne, txtvarcol, txtvarligne) {
+  tabout <- tab %>% 
+    # restriction de la table aux variables utiles
+    select({{poids}},{{varcol}},{{varligne}}) %>%  filter(!is.na({{poids}})) %>%
+    # calcul des effectifs (pondérés) pour chaque croisement des deux variables pertinentes
+    group_by({{varcol}},{{varligne}}) %>%  summarise(nb = sum({{poids}})) %>%  ungroup() %>% 
+    # exprime en pourcentage du total selon la variable principale
+    group_by({{varcol}}) %>% mutate(lim = round(100 * nb / sum(nb) , 0) ) %>% ungroup() %>% 
+    # met sous la forme d'un tableau croisé
+    mutate( varcol = paste(txtvarcol,{{varcol}},sep="."),
+            valvar = {{varligne}}) %>% 
+    select(-c({{varcol}},{{varligne}}) )  %>%
+    select(valvar,varcol,lim) %>% spread(key=varcol,value=lim) %>%
+    # ajoute le nom de la variable en ligne
+    mutate(nomvar = txtvarligne)
+  return(tabout)
+}
+
+# ================================================================================================
+    
+```
+
+# Introduction
+
+Ce programme correspond aux travaux sur les liens entre retraite et incapacités (au sens de l'indicateur GALI) : âge de départ à la retraite selon le niveau d'incapacité, espérance de durée de retraite sans incapacité, niveau d'incapacité au point de départ de la pension, lien entre CSP et incapacités ...
+
+Le principal produit de ce travail est un Etudes et résultats (n°1143). Le fichier HTML issu du présent R Markdown fournit tous les résultats complémentaires.
+
+Les calculs s'appuient pour l'essentiel sur l'enquête Emploi de l'Insee, mais des compléments, visant à tester la robustesse des résulats, sont menés à partir de l'enquête SRCV et de l'enquête Motivations de départ à la retraite.
+
+**NB :** *Les compléments utilisant d'autres sources que l'enquête Emploi ne sont pas repris dans cette version du code-source !*
+
+Pour ce qui concerne les âges moyens (départ à la retraite, fin d'emploi, etc.), tous les indicateurs sont de type "âges conjoncturels", c'est-à-dire qu'ils sont calculés à partir des taux de retraités (resp. d'emploi ou d'activité) et correspondent à la situation d'une génération fictive ayant à tous âges les caractéristiques de l'année en cours. 
+La notion d'âge conjoncturel de fin d'emploi peut toutefois prêter à confusion pour les personnes totalement en dehors du marché du travail (le fait de calculer un âge conjoncturel à partir des taux d'emploi après 50 ans seulement, qui peut donner l'impression que les personnes étaient en emploi juste avant 50 ans, est en effet trompeur). Dans l'ER qui est tiré de ces travaux, on utilise donc l'indicateur d'âge conjoncturel pour le départ à la retraite, mais l'indicateurs de durée moyenne passée après 50 ans pour l'emploi et l'activité.
+
+Le champ de l'analyse exclut les personnes n'ayant jamais travaillé (variable CSTOT de l'enquête Emploi égale à 81, 85 ou 86), et s'appuie sur les taux de retraités, d'activité et d'emploi. Pour rappel, le taux de retraité est par construction nul dans l'enquête Emploi avant 53 ans, car la variable sur le statut de retraité n'est disponible qu'à partir de cet âge.
+
+# Partie technique : organisation du programme
+
+La **première partie** du programme est constituée de fonctions servant à extraire des données de l'enquête Emploi. Cette extraction prend un certain temps : pour éviter d'avoir à la refaire à chaque fois, on produit et stocke des tables intermédiaires avec des valeurs moyennes par année x sexe x âge.
+
+*RQ* : On ne peut utiliser les données de l'enquête Emploi que depuis 2013, car avant cette date la question sur l'indicateur GALI n'était pas disponible.
+
+```{r message=FALSE,echo=FALSE}
+
+# construction des bases de données :
+
+  # RQ : si les prévalences tirées de l'enquête Emploi ont déjà été extraites dans un .csv, on remplace TRUE
+  #      par FALSE ci-dessous (pour gagner beaucoup de temps ...)
+if (refait.tout) { 
+  extraitEEC(dirdonnees)
+} else { 
+  #suffixeTab <- "_ER1143"
+  suffixeTab <- "_2013_2019"
+  # tabeec : valeurs moyennes par année
+  tabeec <- read.csv2(paste(dirdonnees,"Prévalences_carac_eec",suffixeTab,".csv",sep=""), 
+                      header = TRUE, stringsAsFactors = FALSE, sep = ";") 
+  
+  # tabeectrim : valeurs moyennes par trimestre
+  tabeectrim <- read.csv2(paste(dirdonnees,"Prévalences_carac_eec_trim",suffixeTab,".csv",sep=""), 
+                          header = TRUE, stringsAsFactors = FALSE, sep = ";")
+  
+  # tablim : tableaux croisés entre le niveau d'incapacité (LIM) et quelques autres variables (CSP, etc.)
+  tablim <- read.csv2(paste(dirdonnees,"Croisement_lim_carac_eec",suffixeTab,".csv",sep=""), 
+                      header = TRUE, stringsAsFactors = FALSE, sep = ";")
+}
+
+```
+
+La **deuxième partie** du programme est consacrée au calcul des âges conjoncturels. Elle contient aussi quelques fonctions de représentation graphique des résultats.
+
+```{r message=FALSE,echo=FALSE}
+
+# calcul des âges conjoncturels
+
+    # moyenne sur toutes les années conservées dans la base
+
+tabeecmoy0 <- tabeec %>%
+  filter(AGE<="70") %>%
+  mutate(nouveauret = replace_na(nouveauret, 0),
+         periode = case_when(annee<=2015 ~ "Moy. avt 2016",
+                             annee>=2016 ~ "Moy. 2016 et après")) %>%
+  select(carac,val.carac,periode,annee,SEXE,AGE,
+         ret, nonret, nonretaod, nouveauret, emploi, actif,nerp, emploihorscumul) 
+
+    # mise en forme du tableau 
+
+tabeecmoy <- tabeecmoy0 %>%
+  gather(key="type.age",value="age",-c(carac,val.carac,periode,annee,SEXE,AGE)) 
+
+  # somme des taux par âge fin, pour calculer des durées conjoncturelles
+
+tabage <- tabeecmoy %>%
+  group_by(carac,val.carac,type.age,periode,annee,SEXE) %>%
+  summarise_at(vars(age),funs(sum)) %>%
+  ungroup() %>%
+  select(carac,val.carac,type.age,periode,annee,SEXE,age) 
+
+ # idem pour l'ensemble des catégories (pour pouvoir faire une ligne "Toutes CS" dans les tableaux de résultatas)
+
+tabeecmoy0all <- tabeec %>%
+  filter(AGE<="70", carac == "CS") %>%
+  mutate(nouveauret = replace_na(nouveauret, 0),
+         periode = case_when(annee<=2015 ~ "Moy. avt 2016",
+                             annee>=2016 ~ "Moy. 2016 et après")) %>%
+  select(carac,periode,annee,SEXE,AGE,
+         ret, nonret, nonretaod, nouveauret, emploi, actif,nerp, emploihorscumul, NbIndiv)  %>%
+  group_by(carac,periode,annee,SEXE,AGE) %>%
+  summarise_at(vars(ret, nonret, nonretaod, nouveauret, emploi, actif,nerp, emploihorscumul),
+               list( ~ weighted.mean(., w=NbIndiv))) %>%
+  ungroup() %>%
+  mutate(val.carac = 9)
+
+tabageall <- tabeecmoy0all %>%
+  gather(key="type.age",value="age",-c(carac,val.carac,periode,annee,SEXE,AGE))  %>%
+  group_by(carac,val.carac,type.age,periode,annee,SEXE) %>%
+  summarise_at(vars(age),funs(sum)) %>%
+  ungroup() %>%
+  select(carac,val.carac,type.age,periode,annee,SEXE,age) 
+
+
+ # Moyenne des durées conjoncturelles et des taux par période de 3 ans
+
+tabageperiode <- tabage %>%
+  group_by(carac,val.carac,type.age,periode, SEXE) %>%
+  summarise_all(list( ~ mean(.))) %>%
+  ungroup()
+
+tabeecmoyperiode <- tabeecmoy %>%
+  group_by(carac,val.carac,AGE,type.age,periode,SEXE) %>%
+  summarise_all(list( ~ mean(.))) %>%
+  ungroup()
+
+# graphiques caractéstiques par caractéristiques
+
+  # fonction MiseEnFormeTab : remet en forme la table pour les représentations graphiques
+
+MiseEnFormeTab <- function(tab,nom.carac,valeurs.carac,modalites.carac,modalites.typeage) {
+  tab %>% 
+    filter(carac == nom.carac,
+           !is.na(val.carac),
+           val.carac %in% valeurs.carac ) %>%
+    mutate(#age = round(age,1),
+           val.carac = recode(val.carac, !!! modalites.carac),
+           type.age = recode(type.age, !!! modalites.typeage),
+           SEXE = recode(SEXE, !!! modalites.SEXE))  
+}
+
+
+```
+
+
+La **troisième partie** du programme extrait les tables de mortalité et importe quelques fonctions utiles pour le calcul des espérances de vie (EV) et des EVSI.
+
+```{r message=FALSE,echo=FALSE}
+
+# source(paste(dirfonctions,"fonctions calcul EV.R",sep=""))
+
+#------------------------------------------------------------------------------------------------------------# On récupére d'abord les tables de mortalité tirées des projections de population de l'Insee
+
+qmortf <- read.csv2(paste(dirdonnees,"qmortF.csv",sep=""), 
+                    header = TRUE, stringsAsFactors = FALSE, sep = ";")
+qmorth <- read.csv2(paste(dirdonnees,"qmortH.csv",sep=""), 
+                    header = TRUE, stringsAsFactors = FALSE, sep = ";")
+
+# NOTA : les fichiers qmortF et qmortH ont été créés en Excel, à partir des fichiers Excel fournis par l'Insee
+# parmi les résultats de ses dernières projections démographiques
+
+# table avec les probabilités de survie après 49 ans
+# (la fonction de survie de l'ensemble est calculée comme moyenne simple des deux sexes)
+
+QMORT_an <- left_join(qmortf %>% melt("age") %>% rename(qmortf = value),
+                      qmorth %>% melt("age") %>% rename(qmorth = value),
+                      by = c("age","variable") ) %>%
+  mutate(qsurvf = 1 - as.integer(qmortf) / 10000,
+         qsurvh = 1 - as.integer(qmorth) / 10000,
+         annee = as.integer(substr(variable,2,5)),
+         generation = annee - age) %>%
+  filter(!is.na(qsurvf),!is.na(qsurvh),age>=49,annee>=anneedeb,annee<=anneefin) %>%
+  select(annee,age,qsurvf,qsurvh) %>%
+  arrange(annee,age) %>%
+  group_by(annee) %>%
+  mutate(probsurvf = cumprod(qsurvf), 
+         probsurvh = cumprod(qsurvh),
+         probsurve = (probsurvf+probsurvh) / 2 ) %>%
+  ungroup()
+
+#------------------------------------------------------------------------------------------------------------
+
+  # On calcule les prévalences moyennes par année (moyenne simple des 4 trimestres de l'année) par sexe et tranche d'âge (âge fin avant 70 ans, âge quinquennal après)  
+
+    # table des prévalences par âge,à partir de l'enquête Emploi
+
+tabprevalence <- tabeectrim %>% 
+  group_by(annee,SEXE,AGE5) %>%
+  summarise_at( vars(ret_lim_sev,ret_lim_mod,ret_nonlim,ret,nonret,lim_sev,lim_mod,nonlim), 
+                funs(mean) ) %>%
+  ungroup() 
+
+  # calcul des EVSI et EVI, à partir des fonctions du proramme "calcul EV.R"
+
+range.an.eec <- c( min(tabprevalence$annee):max(tabprevalence$annee) )
+
+tabDecompoEV <- data.frame(an = c( range.an.eec, range.an.eec ),
+                           SEXE = c( rep(1,NROW(range.an.eec)), 
+                                     rep(2,NROW(range.an.eec))) ) %>%
+  group_by(an, SEXE) %>%
+  mutate(nonret = EVCARmoy_an(an,SEXE,50,QMORT_an,
+                              breakage,"nonret",tabprevalence %>% filter(annee == an)),
+         ret_lim_sev = EVCARmoy_an(an,SEXE,50,QMORT_an,
+                                   breakage,"ret_lim_sev",tabprevalence %>% filter(annee == an)),
+         ret_lim_mod = EVCARmoy_an(an,SEXE,50,QMORT_an,
+                                   breakage,"ret_lim_mod",tabprevalence %>% filter(annee == an)),
+         ret_nonlim = EVCARmoy_an(an,SEXE,50,QMORT_an,
+                                  breakage,"ret_nonlim",tabprevalence %>% filter(annee == an)),
+         ret = ret_lim_sev + ret_lim_mod + ret_nonlim ) %>%
+  ungroup()
+
+  # mise en forme de la base
+
+tabDecompoEV <- rbind(tabDecompoEV,
+                      tabDecompoEV %>%
+                        group_by(an) %>%
+                        summarise_all(mean) %>%
+                        mutate(SEXE = 0) )
+
+tabDecompoEV.pct <- tabDecompoEV %>%
+  select(SEXE,an,ret_lim_sev,ret_lim_mod,ret_nonlim) %>%
+  gather(key="lim",value="EV",-c(an,SEXE)) %>%
+  left_join(tabDecompoEV %>% select(SEXE,an,ret),
+            by =c("SEXE","an")) %>%
+  mutate(EV.pct = EV / ret)
+
+# ---------------------
+
+```
+
+La **dernière partie** du programme est constituée de diverses analyses descriptives, pour explorer les données dans une optique de vérification.
+
+# Retraite et incapacités : analyse complète
+
+## Âges conjoncturels selon les limitations d'activité
+
+Les comparaisons des différents âges conjoncturels et durées conjoncturelles selon le niveau d'incapacité font clairement apparaître que :
+
+* Les personnes fortement limitées sortent nettement plus tôt de l'emploi et de l'activité
+* mais liquident leurs droits à la retaite un peu plus tard
+* et cela s'explique notamment par les possibilités de départ anticipé : l'écart disparaît lorsqu'on neutralise ces départs.
+* ces résultats se vérifient séparement parmi les hommes et parmi les femmes. Cependant, le départ à la retraite plus tardif des personnes fortement limitées par rapport aux non limitées est un peu plus marqué parmi les hommes.
+
+*RQ* : "neutraliser les départs anticipés" signifie ici que, en cas de départ avant l'AOD de droit commun, c'est cet AOD de droit commun qui est considéré comme âge de liquidation, plutôt que l'âge effectif de départ à la retraite.
+
+```{r message=FALSE,echo=FALSE}
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabage %>% 
+                      filter(annee == anneerepr,
+                             type.age %in% c("nonret","nonretaod","actif","emploihorscumul")),
+                    nom.carac="LIMACT",
+                    valeurs.carac=c(1:3),
+                    modalites.carac=modalites.limact,
+                    modalites.typeage = noms.modalites.dureesconj), 
+    aes(y = age, x = val.carac, colour = type.age, group=type.age))  + 
+    geom_line( ) +
+    geom_point() +
+    facet_wrap(~ SEXE, ncol=3) +
+    labs(title=paste("Durées conjoncturelles après 50 ans, en",anneerepr), 
+         y="durée conjoncturelle", 
+         x = "niveau de limitations")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+
+```
+
+Les effectifs de personnes fortement limitées sont assez faibles dans l'enquête Emploi, d'où une série un peu bruitée, mais des évolutions apparaissent nettement au fil des années :
+
+* l'âge de liquidation augmente quel que soit le niveau d'incapacité, voire un peu plus pour les plus fortement limités
+* la durée conjoncturelle en emploi augmente elle surtout pour les personnes sans incapacités, alors qu'elle stagne pour les personnes fortement limitées.
+
+En conséquence, l'écart entre l'âge de fin d'emploi (hors cumul emploi-retraite) et l'âge de liquidation des droits augmente davantage pour les personnes fortement limitées.
+
+
+```{r message=FALSE,echo=FALSE}
+
+# graphique divers âges conjoncturels en fonction de l'année
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabage %>% 
+                      filter(SEXE == "0", type.age %in% c("nonret","nonretaod")) %>%
+                      mutate(age = age+50),
+                    nom.carac="LIMACT",
+                    valeurs.carac=c(1:3),
+                    modalites.carac=modalites.limact,
+                    modalites.typeage = noms.modalites.dureesconj), 
+    aes(y = age, x = annee, colour = val.carac, group=val.carac))  + 
+    geom_line( ) +
+    geom_point() +
+    facet_wrap(~ type.age, ncol=4) +
+    labs(title="Âges conjoncturels de départ à la retraite", 
+         y="âge conjoncturel", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+# graphique diverses durées conjoncturelles en fonction de l'année
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabage %>% 
+                      filter(SEXE == "0", type.age %in% c("emploi","emploihorscumul","actif","nerp")),
+                    nom.carac="LIMACT",
+                    valeurs.carac=c(1:3),
+                    modalites.carac=modalites.limact,
+                    modalites.typeage = noms.modalites.dureesconj), 
+    aes(y = age, x = annee, colour = val.carac, group=val.carac)) +
+    facet_wrap(~ type.age, ncol=4)  + 
+    geom_line( ) +
+    geom_point() +
+    labs(title="Duréers conjoncturelles après 50 ans", 
+         y="durée conjoncturelle", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+# graphique évolution de la durée nerp, par sexe
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabage %>% 
+                      filter(type.age %in% c("nerp")) %>%
+                      mutate( SEXE = recode(SEXE, !!! modalites.SEXE) ),
+                    nom.carac="LIMACT",
+                    valeurs.carac=c(1:3),
+                    modalites.carac=modalites.limact,
+                    modalites.typeage = noms.modalites.dureesconj ), 
+    aes(y = age, x = annee, colour = val.carac, group=val.carac)) +
+    facet_wrap(~ SEXE, ncol=3)  + 
+    geom_line( ) +
+    geom_point() +
+    labs(title="Durées conjoncturelles sans emploi ni retraite après 50 ans", 
+         y="durée conjoncturelle", 
+         x = "Sexe et année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+```
+
+## Taux d'emploi et de retraités
+
+Les taux d'emploi et de retraités confirment et affinent ces résultats. Les taux d'emploi et d'activité diminuent avec l'âge quel que soit le niveau d'incapacité, mais le taux d'emploi à 53 ans est déjà nettement plus bas (moins de 50 %) pour les personnes fortement limitées. Le taux de retraités est plus faible pour ces personnes avant 62 ans; il devient ensuite légèrement plus élevé que celui des personnes sans incapacité à partir de 62 ans, mais l'écart reste modéré. Une partie non négligeable des personnes fortement limitées liquide ses droits après 62 ans, jusqu'à 67 ans. On interprète cela comme le fait qu'ils n'ont pas bénéficié du taux plein au titre de l'inaptitude, soit parce qu'ils ne l'ont pas sollicité, soit parce que cela ne leur a pas été reconnu (rappelons que les incapacités sont ici repérées par l'indicateur GALI, donc sont déclaratives).
+
+En pratique, les personnes handicapées (fortement limitées) sont en grande partie NERP (ni en emploi, ni à la retraite) : un peu plus de 60 % au alentours de 60 ans, contre moins de 20 % pour les personnes sans incapacité.
+
+```{r message=FALSE,echo=FALSE}
+
+  # taux d'emploi (hors cumul), d'activité et de retraités selon l'âge, en 2018 (si anneerepr = 2018)
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabeecmoy %>% 
+                      filter(annee == anneerepr, 
+                             SEXE == "0", type.age %in% c("ret","actif","emploihorscumul")),
+                    nom.carac="LIMACT",
+                    valeurs.carac=c(1:3),
+                    modalites.carac=modalites.limact,
+                    modalites.typeage = noms.modalites.taux), 
+    aes(y = age, x = AGE, colour = val.carac, group=val.carac))  + 
+    geom_line( ) +
+    geom_point() +
+    facet_wrap(~ type.age, ncol=4) +
+    labs(title=paste("Taux d'emploi et de retraités selon l'âge, en",anneerepr), 
+         y="Taux", 
+         x = "âge")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+  # taux de seniors NERP selon l'âge, en 2018 (si anneerepr = 2018)
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabeecmoy %>% 
+                      filter(annee == anneerepr, type.age %in% c("nerp")),
+                    nom.carac="LIMACT",
+                    valeurs.carac=c(1:3),
+                    modalites.carac=modalites.limact,
+                    modalites.typeage = noms.modalites.taux), 
+    aes(y = age, x = AGE, colour = val.carac, group=val.carac))  + 
+    geom_line( ) +
+    geom_point() +
+    facet_wrap(~ SEXE, ncol=3) +
+    labs(title=paste("Taux de seniors ni en emploi ni à la retraite, en",anneerepr), 
+         y="Taux", 
+         x = "âge")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+  # taux de nouveaux retraités selon l'âge, en 2018 (si anneerepr = 2018)
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabeecmoy %>% 
+                      filter(annee == anneerepr, SEXE == "0", type.age %in% c("nouveauret")),
+                    nom.carac="LIMACT",
+                    valeurs.carac=c(1:3),
+                    modalites.carac=modalites.limact,
+                    modalites.typeage = noms.modalites.taux), 
+    aes(y = age, x = AGE, colour = val.carac, group=val.carac))  + 
+    geom_line( ) +
+    geom_point() +
+    labs(title=paste("Taux de nouveaux retraités, en",anneerepr), 
+         y="Taux", 
+         x = "âge")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+  # taux de seniors en emploi, NERP ou à la retraite au fil du temps
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabeecmoy %>% 
+                      filter(AGE %in% c(60), 
+                             SEXE == "0", 
+                             type.age %in% c("ret","nerp","emploihorscumul")),
+                    nom.carac="LIMACT",
+                    valeurs.carac=c(1:3),
+                    modalites.carac=modalites.limact,
+                    modalites.typeage = noms.modalites.taux), 
+    aes(y = age, x = annee, colour = val.carac, group=val.carac))  + 
+    geom_line( ) +
+    geom_point() +
+    facet_wrap(~ type.age, ncol=3) +
+    labs(title="taux à 60 ans, selon l'année", 
+         y="Taux", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabeecmoy %>% 
+                      filter(AGE %in% c(62), 
+                             SEXE == "0", 
+                             type.age %in% c("ret","nerp","emploihorscumul")),
+                    nom.carac="LIMACT",
+                    valeurs.carac=c(1:3),
+                    modalites.carac=modalites.limact,
+                    modalites.typeage = noms.modalites.taux), 
+    aes(y = age, x = annee, colour = val.carac, group=val.carac))  + 
+    geom_line( ) +
+    geom_point() +
+    facet_wrap(~ type.age, ncol=3) +
+    labs(title="taux à 62 ans, selon l'année", 
+         y="Taux", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+
+
+```
+
+
+
+## Prévalence des limitations d'activité, par âge et au point de départ de la pension
+
+Au cours de la première année de retraite, environ 8 % des retraités sont fortement limités et environ 15 % limités mais pas fortement. Ces proportions sont similaires parmi les femmes et parmi les hommes, et globalement stables au cours du temps.
+
+La première année de retraite est ici repérée dans l'enquête Emploi par le fait d'être à la retraite (au sens de la variable RET) et de déclarer ne pas être à la retraite 12 mois auparavant (au sens de la variable EOCCUA de l'enquête Emploi). Le filtre appliqué est le suivant : *(RET == "1") x (EOCCUA != '4') x (AGE<70)*.
+
+*Rq* : les cas qui ne somment pas à 100 % dans le graphique ci-après s'expliquent par la non-réponse à la variable sur les limitations.
+
+```{r message=FALSE,echo=FALSE}
+
+  # prévalences des limitations au point de départ de la pension
+   # (RQ : "point de départ" = personnes retraités et qui déclarent qu'elles n'étaient pas retraitées un an avant)
+
+tabdebpens <- tablim %>% 
+  filter(valvar %in% c(1:3) ) %>%
+  mutate(valvar = recode(valvar, !!! modalites.limact),
+         SEXE = recode(SEXE, !!! modalites.SEXE)) %>%
+  select(SEXE,valvar,annee,nouveauret.1)
+
+ggplotly( 
+  ggplot_bar_local(
+    tabdebpens, 
+    aes(y = nouveauret.1, x = annee, fill = valvar, label = round(nouveauret.1,0)) )  + 
+    geom_bar(position = 'stack',  stat="identity" ) +
+    geom_text(position = position_stack(vjust=0.5, reverse=FALSE) ) +
+    facet_wrap(~ SEXE, ncol=3) +
+    labs(title="Prévalence des incapacités au point de départ de la pension", 
+         y="Prévalence", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+```
+
+Lorsqu'on se place aux alentours de 60 ans, les prévalences des incapacités sont un peu plus élevées : de l'ordre de 11-12 % pour les fortes limitations. Le profil est en cloche : il augmente entre 55 et 60 ans puis diminue entre 60 et 65 ans. Ce résultat apparement contre intuitif pourrait s'expliquer par le lien avec le marché du travail : les personnes de 65 ans, davantage retirées du marché, pourraient déclarer moins de limitations parce qu'elles ne considèrent plus l'emploi parmi les "activités que les gens font habituellement."
+
+
+```{r message=FALSE,echo=FALSE}
+
+  # prévalences des limitations autour de 60 ans
+
+tab60 <- tabeec %>% 
+  filter(carac == "LIMACT") %>%
+  select(annee,SEXE,AGE,lim_sev,lim_mod,nonlim,NbIndiv) %>%
+  group_by(annee,SEXE,AGE) %>%
+  summarise_at(vars(lim_sev,lim_mod,nonlim),list( ~ weighted.mean(., w=NbIndiv))) %>%
+  ungroup() %>%
+  gather(key="lim",value="prevalence",-c(annee,SEXE,AGE)) %>%
+  mutate(lim = recode(lim, 
+                      "lim_sev" = "fortement limité",
+                      "lim_mod" = "limité, mais pas fortement",
+                      "nonlim" = "non limité"),
+         SEXE = recode(SEXE, !!! modalites.SEXE)) 
+
+
+ggplotly( 
+  ggplot_bar_local(
+    tab60 %>% filter(annee == anneerepr,(AGE>=55 & AGE<=65)), 
+    aes(y = 100*prevalence, x = AGE, fill = lim, label = round(100*prevalence,0)) )  + 
+    geom_bar(position = 'stack',  stat="identity" ) +
+    geom_text(position = position_stack(vjust=0.5, reverse=FALSE) ) +
+    facet_wrap(~ SEXE, ncol=3) +
+    labs(title=paste("Prévalence des incapacités selon l'âge en",anneerepr), 
+         y="Prévalence", 
+         x = "âge")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+ggplotly( 
+  ggplot_bar_local(
+    tab60 %>% group_by(annee,SEXE,lim) %>% summarise_all(funs(mean)) %>% ungroup(), 
+    aes(y = 100*prevalence, x = annee, fill = lim, label = round(100*prevalence,0)) )  + 
+    geom_bar(position = 'stack',  stat="identity" ) +
+    geom_text(position = position_stack(vjust=0.5, reverse=FALSE) ) +
+    facet_wrap(~ SEXE, ncol=3) +
+    labs(title="Prévalence des incapacités selon l'année, moyenne 55 à 65 ans", 
+         y="Prévalence", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+# prévalences par âge fin entre 50 et 70 ans
+
+ggplotly( 
+  ggplot_line_local(
+    tab60 %>% filter(lim %in% c("fortement limité","limité, mais pas fortement"),SEXE == "Ensemble",(AGE>=50 & AGE<=85)  ), 
+    aes(y = 100*prevalence, x = AGE, colour = as.factor(annee), group = as.factor(annee)) )  + 
+    geom_line() +
+    facet_wrap(~ lim, ncol=2) +
+    labs(title="Prévalence des incapacités selon l'âge", 
+         y="Prévalence", 
+         x = "âge")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+ggplotly( 
+  ggplot_line_local(
+    tab60 %>% filter(lim %in% c("fortement limité","limité, mais pas fortement"),SEXE == "Ensemble",(AGE>=50 & AGE<=70)  ) %>%
+      group_by(lim,AGE) %>% summarize_all(mean) %>% ungroup(), 
+    aes(y = 100*prevalence, x = AGE, colour = as.factor(annee), group = as.factor(annee), label = round(100*prevalence,0))  )  + 
+    geom_line() +
+    geom_text(aes(y = 100*prevalence+2) ) +
+    facet_wrap(~ lim, ncol=2) +
+    labs(title=paste("Prévalence des incapacités selon l'âge (moyenne ",anneedeb,"-",anneefin,")",sep=""), 
+         y="Prévalence", 
+         x = "âge")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+```
+
+
+## Selon la catégorie socioprofessionnelle (ou l'ancienne pour les retraités)
+
+Les disparités entre CSP ne sont pas l'objet de cette étude. On les présente ici en tant que compléments des limitations d'activité, en mettant notamment en avant les disparités de limitations au point de départ de la pension.
+
+Les prévalences des limitations au point départ de la pension sont corrélées à la CS : elles sont beaucoup plus faibles pour les cadres et pour les chefs d'entreprise que pour les ouvriers et pour les employés.
+
+
+```{r message=FALSE,echo=FALSE}
+
+tabcsdebpens <- tablim %>% 
+  filter(valvar %in% c(1:3)) %>%
+  mutate(valvar = recode(valvar, !!! modalites.limact),
+         SEXE = recode(SEXE, !!! modalites.SEXE)) %>%
+  select(SEXE,valvar,annee,CS.1,CS.2,CS.3,CS.4,CS.5,CS.6) %>%
+  gather(key="CS",value="prevalence",-c(SEXE,valvar,annee)) %>%
+  mutate(CS = substr(CS,4,5),
+         CS = recode(CS, !!! modalites.cs))
+
+
+ggplotly( 
+  ggplot_bar_local(
+    tabcsdebpens %>% filter(annee == anneerepr), 
+    aes(y = prevalence, x = CS, fill = valvar, label = round(prevalence,0)) )  + 
+    geom_bar(position = 'stack',  stat="identity" ) +
+    geom_text(position = position_stack(vjust=0.5, reverse=FALSE) ) +
+    facet_wrap(~ SEXE, ncol=3) +
+    labs(title=paste("Prévalence des incapacités par les nouveaux retraités, selon la CS en ",anneerepr), 
+         y="Prévalence", 
+         x = "CS")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+ggplotly( 
+  ggplot_bar_local(
+    tabcsdebpens %>% filter(SEXE == "Ensemble"), 
+    aes(y = prevalence, x = annee, fill = valvar, label = round(prevalence,0)) )  + 
+    geom_bar(position = 'stack',  stat="identity" ) +
+    geom_text(position = position_stack(vjust=0.5, reverse=FALSE) ) +
+    facet_wrap(~ CS, ncol=6) +
+    labs(title=paste("Prévalence des incapacités par les nouveaux retraités, selon la CS en",anneerepr), 
+         y="Prévalence", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+
+```
+
+
+```{r message=FALSE,echo=FALSE}
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabage %>% 
+                      filter(annee >= 2017, type.age %in% c("nonret","emploihorscumul")) %>%
+                      select(SEXE,type.age,carac,val.carac,age) %>%
+                      group_by(SEXE,type.age,carac,val.carac) %>%
+                      summarise_all(mean) %>%
+                      ungroup() %>%
+                      mutate(age = age + 50),
+                    nom.carac="CS",
+                    valeurs.carac=c(1:6),
+                    modalites.carac=modalites.cs,
+                    modalites.typeage = noms.modalites.dureesconj), 
+    aes(y = age, x = val.carac, colour = type.age, group=type.age))  + 
+    geom_line( ) +
+    geom_point() +
+    facet_wrap(~ SEXE, ncol=3) +
+    labs(title="Âges conjoncturels, selon la CS (moyenne 2017 et après)", 
+         y="durée conjoncturelle", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+  # Durées conjoncturelles en emploi et NER, et âges conjoncturels de départ à la retraite
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabage %>% 
+                      filter(SEXE == "0", type.age %in% c("nerp","emploihorscumul")),
+                    nom.carac="CS",
+                    valeurs.carac=c(1:6),
+                    modalites.carac=modalites.cs,
+                    modalites.typeage = noms.modalites.dureesconj), 
+    aes(y = age, x = annee, colour = val.carac, group=val.carac))  + 
+    geom_line( ) +
+    geom_point() +
+    facet_wrap(~ type.age, ncol=2) +
+    labs(title="Durées conjoncturelles après 50 ans, selon la CS", 
+         y="durée conjoncturelle", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+
+ggplotly( 
+  ggplot_line_local(
+    MiseEnFormeTab( tabage %>% 
+                      filter(SEXE == "0", type.age %in% c("nonret","nonretaod")) %>%
+                      mutate(age = 50 + age),
+                    nom.carac="CS",
+                    valeurs.carac=c(1:6),
+                    modalites.carac=modalites.cs,
+                    modalites.typeage = noms.modalites.dureesconj), 
+    aes(y = age, x = annee, colour = val.carac, group=val.carac))  + 
+    geom_line( ) +
+    geom_point() +
+    facet_wrap(~ type.age, ncol=2) +
+    labs(title="Âge conjoncturel de départ à la retraite, selon la CS", 
+         y="âge conjoncturel", 
+         x = "année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+```
+
+
+## Espérance de vie en retraite sans incapacité
+
+L'espérance de durée de retraite sans incapacité est calculée selon une notion instantanée, c'est-à-dire représentative d'une génération fictive qui connaîtrait pendant toute sa vie les conditions de mortalité, de départ à la retraite, et de prévalence des limitations d'activité de l'année en cours.
+
+Les graphiques suivant détaillent ensuite chacun des éléments entrant en compte dans l'indicateur.
+
+
+```{r message=FALSE,echo=FALSE}
+
+ggplotly( 
+  ggplot_bar_local(
+    tabDecompoEV.pct %>%
+      mutate(EV.pct = 100 * EV.pct,
+             SEXE = recode(SEXE, !!! modalites.SEXE),
+             lim = recode(lim, 
+                       "nonret" = "Non retraité",
+                       "ret" = "retraite",
+                       "ret_lim_sev" = "Limitations sévères",
+                       "ret_lim_mod" = "Limitations légères",
+                       "ret_nonlim" = "Aucune limitation")), 
+    aes(y = EV.pct, x = an, fill = lim, label = round(EV.pct,0)) )  + 
+    geom_bar(position = 'stack',  stat="identity" ) +
+    geom_text(position = position_stack(vjust=0.5, reverse=FALSE) ) +
+    facet_wrap(~ SEXE, ncol=3) +
+    labs(title="Décomposition de la durée espérée de retraite par niveau de limitations", 
+         y="Proportion de l'espérance de retraite", 
+         x = "Sexe et année")
+  ) %>%
+  layout(legend = list(orientation = "h", x = 0.2, y = -0.2))
+
+
+
+```
+
+
+# Illustrations de l'ER
+
+##Graph 1.âge de fin d'emploi, de liq retraite par niveau de limitation
+
+Ce graphique est créé sous deux versions : le graphique de "Une web" (illustration sur le site web) et le "graphique 1" dans la publication (fichier PDF).
+
+```{r message=FALSE,echo=FALSE}
+
+# Graph 1.âge de fin d'emploi, de liq retraite par niveau de limitation
+
+tabgraph1 <- tabage %>% 
+    filter(carac == "LIMACT",
+           #annee == 2018,
+           annee %in% c(2013,2018),
+           SEXE == "0",
+           !is.na(val.carac),
+           val.carac %in% c(1:3),
+           type.age %in% c("emploihorscumul","nerp","nonret" )) %>%
+    mutate(age = round(age,1),
+           val.carac = recode(val.carac, !!! modalites.limact),
+           annee = recode(annee, "2013" = "En 2013", "2018" = "En 2018"),
+           age = case_when(type.age == "nonret" ~ age + 50,
+                           TRUE ~ age ),
+           type.duree = recode(type.age, 
+                          "emploihorscumul" = "Durée moyenne en emploi (hors cumul)",
+                          "nerp" = "Durée moyenne sans emploi ni retraite",
+                          "nonret" = "Âge conjoncturel de départ à la retraite"),
+           type.duree = factor(type.duree, levels=c("Âge conjoncturel de départ à la retraite","Durée moyenne sans emploi ni retraite","Durée moyenne en emploi (hors cumul)"))) %>%
+  select(age,annee,val.carac,type.duree,type.age)
+
+g1.titre <- "Graphique 1 : Âges conjoncturels de départ à la retraite et durée moyenne en emploi après 50 ans, selon le niveau d'incapacité"
+g1.lecture <- "En moyenne en 2018, entre 50 ans et la liquidation de leurs droits à la retraite, les personnes fortement limitées dans les activités de la vie quotidienne passent 3,9 ans en emploi et 8,5 ans hors de l'emploi et de la retraite. Leur âge conjoncturel de départ à la retraite est de 62,4 ans."
+g1.champ <- "France métropolitaine, hors personnes n'ayant jamais travaillé."
+g1.source <- "Enquête Emploi (Insee), calculs DREES."
+
+  # graphique Une Web
+
+tabgraphUneWeb <- tabgraph1 %>% filter(annee == "En 2018") %>% select(-annee)
+
+gUneWeb.titre <- " Âges conjoncturels de départ à la retraite et durée moyenne en emploi après 50 ans, 
+selon le niveau d'incapacité"
+
+ggplot_bar_local() +
+  geom_bar(data = tabgraphUneWeb %>% filter(type.age %in% c("emploihorscumul","nerp" )),
+           aes(y = age, x = val.carac, fill = type.duree ),
+           position = 'stack',  stat="identity" )  +
+  geom_text(data = tabgraphUneWeb %>% filter(type.age %in% c("emploihorscumul","nerp" )),
+           aes(y = age, x = val.carac, label = round(age,1) ),
+           position = position_stack(vjust=0.5, reverse=FALSE) )  +
+  geom_point(data = tabgraphUneWeb %>% filter(type.age %in% c("nonret" )),
+             aes(y = age-50, x = val.carac, colour = type.duree, group = type.duree)) +
+  geom_text(data = tabgraphUneWeb %>% filter(type.age %in% c("nonret" )), 
+            aes(y = age+1-50, x = val.carac, label = age)) +
+  labs(title = gUneWeb.titre, 
+       x="Limitations dans les activités de la vie quotidienne : personnes ...", 
+       y = "Durée moyenne en années") +
+  bas_de_tableau("ER",
+                 lecture = g1.lecture,
+                 champ = g1.champ,
+                 source  = g1.source)
+
+tabgraphUneWeb <- tabgraphUneWeb %>%
+  select(age,val.carac,type.duree) %>%
+  spread(key="type.duree",value="age") %>%
+  rename("Limitations dans les activités de la vie quotidienne : personnes ..." = val.carac)
+
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = tabgraphUneWeb ,
+                       fichier_destination = "ER Retraite et incapacités.xlsx",
+                       onglet = "Graphique Une Web",
+                       titre = gUneWeb.titre,
+                       lecture = g1.lecture,
+                       champ = g1.champ,
+                       sources = g1.source, 
+                       visualiser = FALSE)
+}
+
+  # graphique 1
+
+ggplot_bar_local() +
+  geom_bar(data = tabgraph1 %>% filter(type.age %in% c("emploihorscumul","nerp" )),
+           aes(y = age, x = val.carac, fill = type.duree ),
+           position = 'stack',  stat="identity" )  +
+  geom_text(data = tabgraph1 %>% filter(type.age %in% c("emploihorscumul","nerp" )),
+           aes(y = age, x = val.carac, label = round(age,1) ),
+           position = position_stack(vjust=0.5, reverse=FALSE) )  +
+  geom_point(data = tabgraph1 %>% filter(type.age %in% c("nonret" )),
+             aes(y = age-50, x = val.carac, colour = type.duree, group = type.duree)) +
+  geom_text(data = tabgraph1 %>% filter(type.age %in% c("nonret" )), 
+            aes(y = age+1-50, x = val.carac, label = age)) +
+  facet_wrap(~ annee, ncol= 2) +
+  labs(title = g1.titre, 
+       x="Limitations dans les activités de la vie quotidienne : personnes ...",  
+       y = "Durée moyenne en années") +
+  bas_de_tableau("ER",
+                 lecture = g1.lecture,
+                 champ = g1.champ,
+                 source  = g1.source)
+
+tabgraph1 <- tabgraph1 %>%
+  select(age,annee,val.carac,type.duree) %>%
+  spread(key="type.duree",value="age") %>%
+  rename("Limitations dans les activités de la vie quotidienne : personnes ..." = val.carac)
+
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = tabgraph1 ,
+                       fichier_source = fichier.excel.ER,
+                       onglet = "Graphique 1",
+                       #noms_lignes = TRUE,
+                       #nombre_decimales_voulues = rep(1,3),
+                       #colonnes_format_specifique = c(2:4),
+                       #format_specifique_voulu = rep("RIEN",3),
+                       #nombre_decimales_voulues = rep(1,3),
+                       titre = g1.titre,
+                       aides_lecture = "Note : les personnes fortement limitées dans les activités de la vie quotidienne sont ici assimilées aux personnes handicapées.",
+                       lecture = g1.lecture,
+                       champ = g1.champ,
+                       sources = g1.source, 
+                       visualiser = FALSE)
+}
+         
+
+```
+
+
+##Graph 2. Proportion emploi/retraite/ner par niveau de limitation, à 61 ans
+
+```{r message=FALSE,echo=FALSE}
+
+# Graphe 2. Proportion emploi/retraite/ner par niveau de limitation, à 61 ans
+
+tabgraph2 <-   tabeecmoy0 %>%
+    filter(SEXE == "0",
+           carac == "LIMACT",
+           val.carac %in% c(1:3),
+           !is.na(val.carac),
+           AGE == 61 ,
+           annee == 2018) %>%
+    mutate(val.carac = recode(val.carac, !!! modalites.limact)) %>%
+    select(val.carac,  ret, emploihorscumul, nerp) %>%
+    arrange(val.carac) %>%
+    mutate_at(vars(ret,emploihorscumul,nerp), list( ~ round(100*.,1))) %>%
+    gather(key="type",value="proportion",-c(val.carac)) %>%
+    mutate(type = recode(type,
+                         "ret" = "Retraite" , 
+                         "emploihorscumul" = "Emploi (hors cumul avec la retraite)", 
+                         "nerp" = "Sans emploi ni retraite"),
+           type = factor(type, levels=c("Retraite","Sans emploi ni retraite","Emploi (hors cumul avec la retraite)")))
+
+g2.titre <- "Graphique 2 : Situation à 61 ans"
+g2.lecture <- "En moyenne en 2018, à l'âge de 61 ans, 13 % des personnes fortement limitées dans les activités de la vie quotidienne sont en emploi et 19 % sont à la retraite ; les 69 % restant sont ni en emploi, ni à la retraite"
+g2.champ <- "France métropolitaine, 2018, hors personnes n'ayant jamais travaillé."
+g2.source <- "Enquête Emploi (Insee), calculs DREES."
+
+ggplot_bar_local(
+  tabgraph2,
+  aes(y = proportion, x = val.carac, fill = type )) + 
+  geom_bar( position = 'stack',  stat="identity" )  +
+  geom_text(aes(label = round(proportion,0)),  position = position_stack(vjust=0.5, reverse=FALSE)) +
+    labs(title = g2.titre, 
+       y="Proportion",
+       x="Limitations dans les activités de la vie quotidienne") +
+  coord_flip() +
+  flip_axes("ER") +
+  bas_de_tableau("ER",
+                 lecture = g2.lecture,
+                 champ = g2.champ,
+                 source  = g2.source)
+
+tabgraph2 <- tabgraph2 %>%
+  mutate(proportion = round(proportion,0)) %>%
+  spread(key="type",value="proportion") %>%
+  rename("Limitations dans les activités de la vie quotidienne : personnes ..." = val.carac) %>%
+  mutate(Total = 100)
+
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = tabgraph2 ,
+                       fichier_source = "ER Retraite et incapacités.xlsx",
+                       onglet = "Graphique 2",
+                       titre = g2.titre,
+                       lecture = g2.lecture,
+                       champ = g2.champ,
+                       sources = g2.source, 
+                       visualiser = FALSE)
+}         
+
+```
+
+
+##Graph 3. Proportion pour chaque limitation, par sexe et : au point de départ de la pension / en % de la durée de retraite (=EVDRSI)
+
+
+```{r message=FALSE,echo=FALSE}
+
+# Graph 3. Proportion pour chaque limitation, par sexe et : au point de départ de la pension / en % de la durée de retraite (=EVDRSI)
+
+tabgraph3a <- tablim %>% 
+  filter(valvar %in% c(1:3),
+         annee == 2018) %>%
+  mutate(pct = nouveauret.1,
+         lim = recode(valvar, 
+                         "1" = "Fortement limité",
+                         "2" = "Limité mais pas fortement",
+                         "3" = "Sans incapacité"),
+         SEXE = recode(SEXE, !!! modalites.SEXE),
+         type = "Au cours de la première année de retraite") %>%
+  select(SEXE,type,lim,pct)
+
+tabgraph3b <- tabDecompoEV.pct %>%
+  filter(an == 2018,
+         lim %in% c("ret_lim_sev", "ret_lim_mod","ret_nonlim" )) %>%
+  mutate(pct = 100 * EV.pct,
+         SEXE = recode(SEXE, !!! modalites.SEXE),
+         lim = recode(lim, 
+                       "nonret" = "Non retraité",
+                       "ret" = "retraite",
+                       "ret_lim_sev" = "Fortement limité",
+                       "ret_lim_mod" = "Limité mais pas fortement",
+                       "ret_nonlim" = "Sans incapacité"),
+         type = "En moyenne sur la durée espérée de retraite") %>%
+  select(SEXE,type,lim,pct)
+
+tabgraph3 <- rbind( tabgraph3a, tabgraph3b)
+
+g3.titre <- "Graphique 3 : Niveau d'incapacité lors de la première année de retraite et en moyenne sur la durée espérée de retraite"
+g3.lecture <- "Avec les conditions de mortalité et d'incapacité de 2018, les hommes peuvent espérer passer 60 % de leur durée de retraite sans incapacité ; au cours de la première année de retraite, 76 % n'ont aucune incapacité."
+g3.champ <- "France métropolitaine, hors personnes n'ayant jamais travaillé."
+g3.source <- "Enquête Emploi et projections de population (Insee), calculs DREES."
+
+ggplot_bar_local(
+  tabgraph3, 
+  aes(y = pct, x = SEXE, fill = lim, label = round(pct,0)) )  + 
+  geom_bar(position = 'stack',  stat="identity" ) +
+  geom_text(position = position_stack(vjust=0.5, reverse=FALSE) ) +
+  facet_wrap(~ type, ncol=2) +
+  labs(title= g3.titre, 
+       y="En %", 
+       x = "Sexe") +
+  bas_de_tableau("ER",
+                 lecture = g3.lecture,
+                 champ = g3.champ,
+                 source  = g3.source)
+
+setcolorder(tabgraph3, c(2,1,3,4))
+
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = tabgraph3 %>%
+                             mutate(pct = round(pct,0)) %>%
+                             arrange(type,SEXE) %>% 
+                             spread(key="lim",value="pct") %>%
+                             mutate(Total = 100) %>%
+                             rename(Sexe = SEXE),
+                       fichier_source = "ER Retraite et incapacités.xlsx",
+                       onglet = "Graphique 3",
+                       titre = g3.titre,
+                       lecture = g3.lecture,
+                       champ = g3.champ,
+                       sources = g3.source, 
+                       visualiser = FALSE)
+}    
+
+```
+
+##Tab Compl Encadré 1. Comparaisons âges conjoncturels de départ à la retraite EEC et Modèle Ancetre.
+
+```{r message=FALSE,echo=FALSE}
+
+# Tab complémentaire de l'encadré 1. Comparaisons âges conjoncturels de départ à la retraite EEC et Modèle Ancetre.
+
+ageconjRR <- read.csv2(paste(dirdonnees,"AgeConjoncturelRetraite_PanoramaRR.csv",sep=""),
+                       header = TRUE, stringsAsFactors = FALSE, sep = ";") %>% 
+  filter(annee>=2013) %>% 
+  select(annee,Ensemble,Femmes,Hommes) %>%
+  gather(key="Sexe",value="AgeConj",-annee )%>%
+  mutate(AgeConj = round(AgeConj,1) ) %>%
+  mutate(Source = "Modèle Ancetre")
+  #spread(key="annee",value="AgeConjAncetre")
+
+ageconjEEC <- tabeectrim %>%
+  filter(trim == 4,
+         nonret < 1) %>%
+  select(annee,SEXE,nonret) %>%
+  group_by(annee,SEXE) %>%
+  summarise_all(sum) %>%
+  ungroup() %>%
+  mutate(AgeConj = round(50+5*nonret,1),
+         Sexe = recode(SEXE, !!! modalites.SEXE) ) %>%
+  select(annee,Sexe,AgeConj) %>%
+  mutate(Source = "Enquête Emploi") #%>%
+  #spread(key="annee",value="AgeConjEEC")
+
+comparageconj <- rbind(ageconjRR,ageconjEEC) %>%
+  spread(key="annee",value="AgeConj")
+
+knitr::kable( comparageconj )  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+  
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = comparageconj,
+                       fichier_source = "ER Retraite et incapacités.xlsx",
+                       onglet = "Tab Compl Encadré 1",
+                       titre = "Tableau complémentaire Encadré 1 : comparaison des âges conjoncturels de départ à la retraite selon la source statistique",
+                       lecture = "En 2017, l'âge conjoncturel de départ à la retraite des hommes est de 61, 9 ans d'après l'enquête Emploi et de 61,7 ans d'après le modèle Ancetre.",
+                       champ = "Résidents en France métropolitaine, hors personnes n'ayant jamais travaillé (Enquête Emploi) ; Résidents en France (modèle Ancetre)",
+                       sources = "Enquête Emploi (Insee) et Modèle Ancetre (DREES) ; calculs DREES", 
+                       visualiser = FALSE)
+} 
+
+```
+
+
+##Tab Compl Encadré 2. Prévalence de limitations d'activité par âge fin (moyenne 2013-2018)
+
+```{r message=FALSE,echo=FALSE}
+
+# Tab complémentaire de l'encadré 2. Prévalence de limitations d'activité par âge fin (moyenne 2013-2018)
+
+tabCompEncadre2 <- tabeec %>% 
+  filter(carac == "LIMACT",
+         SEXE == 0,
+         (AGE>=50 & AGE<=90),
+         (annee>=2013 & annee<=2018)) %>%
+  select(annee,AGE,lim_sev,lim_mod,nonlim,NbIndiv) %>%
+  group_by(annee,AGE) %>%
+  summarise_at(vars(lim_sev,lim_mod,nonlim),list( ~ weighted.mean(., w=NbIndiv))) %>%
+  ungroup() %>%
+  group_by(AGE) %>% 
+  summarize_all(mean) %>% 
+  ungroup() %>%
+  select(AGE,lim_sev,lim_mod) %>%
+  rename("Âge" = AGE,
+         "Fortement limité" = lim_sev,
+         "Limité, mais pas fortement" = lim_mod)
+
+knitr::kable( tabCompEncadre2 )  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = tabCompEncadre2,
+                       fichier_source = "ER Retraite et incapacités.xlsx",
+                       onglet = "Tab Compl Encadré 2",
+                       titre = "Tableau complémentaire Encadré 2 : Prévalence des incapacités par âge fin entre 60 et 90 ans",
+                       champ = "Résidents en France métropolitaine, hors personnes n'ayant jamais travaillé. Moyenne 2013 à 2018",
+                       sources = "Enquête Emploi (Insee) ; calculs DREES", 
+                       visualiser = FALSE)
+} 
+
+```
+
+
+##Tab A complémentaire. Ages conjoncturels de départ à la retraite et durées moyennes en activité et en emploi après 50 ans, selon le sexe et le niveau d'incapacité
+
+
+```{r message=FALSE,echo=FALSE}
+
+# Tab A complémentaire. Âges conjoncturels de départ à la retraite et durées moyennes en activité et en emploi après 50 ans, selon le sexe et le niveau d'incapacité
+
+tabcomplA <- tabage %>% 
+    filter(carac == "LIMACT",
+           #annee == 2018,
+           !is.na(val.carac),
+           val.carac %in% c(1:3),
+           type.age %in% c("emploihorscumul","emploi","actif","nerp","nonret","nonretaod" )) %>%
+    mutate(age = round(age,1),
+           val.carac = recode(val.carac, !!! modalites.limact),
+           age = case_when(type.age %in% c("nonret","nonretaod") ~ age + 50,
+                           TRUE ~ age ),
+           SEXE = recode(SEXE, !!! modalites.SEXE),
+           type.duree = recode(type.age, !!! list(
+             "nonret" = "Âge conjoncturel de départ à la retraite", 
+             "emploi" = "Durée moyenne en emploi (y compris cumul avec la retraite)",
+             "actif" = "Durée moyenne en activité (emploi ou chômage)",
+             "nonretaod" = "Âge conjoncturel de départ à la retraite (neutralisation des départs avant l'AOD)",
+             "nerp" = "Durée moyenne sans emploi ni retraite",
+             "emploihorscumul" = "Durée moyenne en emploi (hors cumul)") ) ) %>%
+  select(age,SEXE,annee,val.carac,type.duree) %>%
+  spread(key="type.duree",value="age") %>%
+  arrange(-annee,SEXE,val.carac) %>%
+  rename("Sexe" = SEXE,
+         "Niveau d'incapacité : Personnes ..." = val.carac)
+
+setcolorder(tabcomplA, c(2,1,3,4,5,6,9,7,8))
+
+knitr::kable( tabcomplA ) %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = tabcomplA,
+                       fichier_source = "ER Retraite et incapacités.xlsx",
+                       onglet = "Tableau complémentaire A",
+                       titre = "Tableau complémentaire A : Âges conjoncturels de départ à la retraite et durées moyennes en activité et en emploi après 50 ans, selon le sexe et le niveau d'incapacité",
+                       aides_lecture = "Note : les personnes fortement limitées dans les activités de la vie quotidienne sont ici assimilées aux personnes handicapées.",
+                       lecture = g1.lecture,
+                       champ = g1.champ,
+                       sources = g1.source,
+                       visualiser = FALSE)
+}   
+
+```
+
+
+##Tableau complémentaire B. Taux de retraités, en emploi, et NER selon l'âge, en 2018
+
+```{r message=FALSE,echo=FALSE}
+
+# Tableau complémentaire B. Taux de retraités, en emploi, et NER selon l'âge, en 2018
+
+tabcomplB <-   tabeecmoy0 %>%
+    filter(SEXE == "0",
+           carac == "LIMACT",
+           val.carac %in% c(1:3),
+           !is.na(val.carac),
+           annee == 2018) %>%
+    mutate(val.carac = recode(val.carac, !!! modalites.limact)) %>%
+    select(val.carac,  AGE, ret, emploihorscumul, nerp) %>%
+    arrange(val.carac, AGE) %>%
+    mutate_at(vars(ret,emploihorscumul,nerp), list( ~ round(100*.,0))) %>%
+    gather(key="type",value="proportion",-c(val.carac,AGE)) %>%
+    mutate(AGE = paste(AGE," ans",sep=""),
+           type = recode(type,
+                         "ret" = "Retraite" , 
+                         "emploihorscumul" = "Emploi (hors cumul avec la retraite)", 
+                         "nerp" = "Sans emploi ni retraite"),
+           type = factor(type, levels=c("Retraite","Sans emploi ni retraite","Emploi (hors cumul avec la retraite)"))) %>%
+  spread(key="AGE",value="proportion")
+
+tabcompB.titre <- "Tableau complémentaire B : Situation d'emploi et de retraite entre 50 et 70 ans, en 2018"
+tabcompB.note <- "Note : dans l'enquête Emploi, les personnes sont systématiquement considérées comme non retraitées avant 53 ans. Dans cette étude, on a considéré que toute personne devenait retraitée à partir de 70 ans."
+tabcompB.lecture <- "En moyenne en 2018, à l'âge de 61 ans, 13 % des personnes fortement limitées dans les activités de la vie quotidienne sont en emploi et 19 % sont à la retraite ; les 69 % restant sont ni en emploi, ni à la retraite"
+tabcompB.champ <- "France métropolitaine, 2018, hors personnes n'ayant jamais travaillé."
+tabcompB.source <- "Enquête Emploi (Insee), calculs DREES."
+
+
+knitr::kable( tabcomplB )  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = tabcomplB %>%
+                         rename("Limitations dans les activités de la vie quotidienne : personnes ..." = val.carac),
+                       fichier_source = "ER Retraite et incapacités.xlsx",
+                       onglet = "Tableau complémentaire B",
+                       titre = tabcompB.titre,
+                       aides_lecture = tabcompB.note,
+                       lecture = tabcompB.lecture,
+                       champ = tabcompB.champ,
+                       sources = tabcompB.source, 
+                       visualiser = FALSE)
+}         
+
+```
+
+##Tab 1. Indicateurs par CS 
+
+```{r message=FALSE,echo=FALSE}
+
+# Tab 1. Indicateurs par CS
+
+tablimdebpens.cs <- tablim %>% 
+  filter(valvar %in% c(1:3), 
+         annee == 2018,
+         SEXE == "0",
+         valvar %in% c(1:2)) %>%
+  mutate(valvar = recode(valvar, !!! list("1" = "Proportion de personnes fortement limitées au cours de la première année de retraite (%)", 
+                                  "2" = "Proportion de personnes limitées, mais pas fortement au cours de la première année de retraite (%)",
+                                  "3" = "Proportion de personnes pas limitées du tout",
+                                  "8" = "refus de répondre",
+                                  "9" = "ne sait pas") )) %>%
+  rename(CS.9 = nouveauret.1) %>%
+  select(valvar,CS.1,CS.2,CS.3,CS.4,CS.5,CS.6,CS.9) %>%
+  gather(key="CS",value="prevalence",-c(valvar)) %>%
+  spread(key = "valvar",value="prevalence") %>%
+  mutate(CS = substr(CS,4,5),
+         CS = recode(CS, !!! modalites.cs))
+
+noms.modalites.ici <- list(
+  "nonret" = "Âge conjoncturel de départ à la retraite", 
+  "nerp" = "Durée moyenne sans emploi ni retraite",
+  "emploihorscumul" = "Durée moyenne en emploi (hors cumul)")
+
+tabage.cs <- MiseEnFormeTab( rbind( tabage , tabageall ) %>% 
+                               filter(SEXE == "0",
+                                      annee == 2018,
+                                      type.age %in% c("nerp","emploihorscumul","nonret")) %>%
+                               mutate(age = case_when(type.age %in% c("nonret") ~ 50+age,
+                                                      TRUE ~ age),
+                                      age = round(age,1)) ,
+                    nom.carac="CS",
+                    valeurs.carac=c(1:6,9),
+                    modalites.carac=modalites.cs,
+                    modalites.typeage = noms.modalites.ici) %>%
+  select(type.age,val.carac,age) %>%
+  rename(CS = val.carac) %>%
+  spread(key = "type.age",value="age")
+
+tab61ans.cs <- rbind( tabeecmoy0 , tabeecmoy0all ) %>%
+  filter(SEXE == "0",
+         carac == "CS",
+         val.carac %in% c(1:6,9),
+         !is.na(val.carac),
+         AGE == 61 ,
+         annee == 2018) %>%
+  mutate(val.carac = recode(val.carac, !!! modalites.cs)) %>%
+  select(val.carac,  ret) %>%
+  arrange(val.carac) %>%
+  mutate_at(vars(ret), list( ~ round(100*.,0))) %>%
+  rename(CS = val.carac,
+         "Proportion de retraités à 61 ans" = ret)
+
+tab.cs <- tablimdebpens.cs %>%
+  left_join(tabage.cs,by="CS") %>%
+  left_join(tab61ans.cs,by="CS") %>%
+  rename("Catégorie socioprofessionnelle" = CS)
+
+setcolorder(tab.cs, c(1,2,3,4,7,5,6))
+
+knitr::kable( tab.cs )  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = tab.cs,
+                       fichier_source = "ER Retraite et incapacités.xlsx",
+                       onglet = "Tableau 1",
+                       titre = "Tableau 1 : Indicateurs selon la catégorie socioprofessionnelles",
+                       aides_lecture = "Note : Les retraités sont classés selon leur catégorie socioprofessionnelle antérieure.",
+                       lecture = "Les ouvriers (ou anciens ouvriers) partent à la retraite en moyenne à 61,9 ans en 2018. 44 % d'entre eux sont déjà retraités à 61 ans, soit dans l'année qui précède l'âge d'ouverture des droits de droit commun.",
+                       champ = "France métropolitaine, 2018, hors personnes n'ayant jamais travaillé.",
+                       sources = "Enquête Emploi (Insee), calculs DREES.", 
+                       visualiser = FALSE)
+  
+  
+
+}     
+
+```
+
+##Tab complémentaire C. Décomposition de la durée espérée de retraite 2013-2018
+
+```{r message=FALSE,echo=FALSE}
+
+# Tab complémentaire C. Décomposition de la durée espérée de retraite 2013-2018
+
+tabcompC <- tabDecompoEV.pct %>%
+  filter(lim %in% c("ret_lim_sev", "ret_lim_mod","ret_nonlim" )) %>%
+  mutate(pct =  round(100 * EV.pct,0) ,
+         SEXE = recode(SEXE, !!! modalites.SEXE),
+         lim = recode(lim, 
+                       "nonret" = "Non retraité",
+                       "ret" = "retraite",
+                       "ret_lim_sev" = "Fortement limité",
+                       "ret_lim_mod" = "Limité mais pas fortement",
+                       "ret_nonlim" = "Sans incapacité"),
+         type = "En moyenne sur la durée espérée de retraite") %>%
+  select(SEXE,an,lim,pct) %>%
+  arrange(SEXE,lim,an) %>% 
+  spread(key="lim",value="pct") %>%
+  mutate(Total = 100) %>%
+  rename(Sexe = SEXE)
+
+knitr::kable( tabcompC )  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+if (exportDREES) {
+  exporter_tableau_punaise(donnees = tabcompC,
+                       fichier_source = fichier.excel.ER,
+                       onglet = "Tableau complémentaire C",
+                       titre = "Tableau complémentaire C : Décomposition de la durée espérée de retraite selon le niveau d'incapacité, par année",
+                       lecture = "Avec les conditions de mortalité et d'incapacité de 2018, les hommes peuvent espérer passer 60 % de leur durée de retraite sans incapacité et les femmes 56 %.",
+                       champ = "France métropolitaine, hors personnes n'ayant jamais travaillé.",
+                       sources = "Enquête Emploi et projections de population (Insee), calculs DREES.", 
+                       visualiser = FALSE)
+}     
+
+```
