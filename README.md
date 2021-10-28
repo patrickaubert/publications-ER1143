@@ -1,5 +1,7 @@
 # ER1143
 
+/!\ Ce repository est un clone, repris du site de diffusion en open source des codes de la DREES : https://gitlab.com/DREES_code/public/etudes/er1143
+
 Ce dossier fournit le programme permettant de produire les illustrations de l'Études et Résultats n° 1143 de la DREES : "Les personnes ayant des incapacités quittent le marché du travail plus jeunes mais liquident leur retraite plus tard".
 Lien vers l'étude : https://drees.solidarites-sante.gouv.fr/etudes-et-statistiques/publications/etudes-et-resultats/article/les-personnes-ayant-des-incapacites-quittent-le-marche-du-travail-plus-jeunes
 
